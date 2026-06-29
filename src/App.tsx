@@ -20,6 +20,16 @@ type SavedPreset = {
 }
 
 const presetStorageKey = '8westbio-peptide-calculator-presets'
+const themeModeStorageKey = '8westbio-peptide-calculator-theme'
+
+type ThemeMode = 'light' | 'dark' | 'system'
+type ResolvedTheme = 'light' | 'dark'
+
+const themeModes: Array<{ id: ThemeMode; label: string; icon: string }> = [
+  { id: 'light', label: 'Light', icon: 'sun' },
+  { id: 'dark', label: 'Dark', icon: 'moon' },
+  { id: 'system', label: 'System', icon: 'monitor' },
+]
 
 const defaultSavedPresets: SavedPreset[] = [
   {
@@ -48,6 +58,25 @@ function loadSavedPresets() {
   } catch {
     return defaultSavedPresets
   }
+}
+
+function getStoredThemeMode(): ThemeMode {
+  if (typeof window === 'undefined') {
+    return 'system'
+  }
+
+  const storedTheme = window.localStorage.getItem(themeModeStorageKey)
+  return storedTheme === 'light' || storedTheme === 'dark' || storedTheme === 'system'
+    ? storedTheme
+    : 'system'
+}
+
+function getSystemTheme(): ResolvedTheme {
+  if (typeof window === 'undefined') {
+    return 'dark'
+  }
+
+  return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
 }
 
 function formatNumber(value: number, decimals = 2) {
@@ -154,6 +183,29 @@ function Icon({ name }: { name: string }) {
         <path d="M8 20v-6h8v6" />
       </>
     ),
+    sun: (
+      <>
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2" />
+        <path d="M12 20v2" />
+        <path d="m4.9 4.9 1.4 1.4" />
+        <path d="m17.7 17.7 1.4 1.4" />
+        <path d="M2 12h2" />
+        <path d="M20 12h2" />
+        <path d="m4.9 19.1 1.4-1.4" />
+        <path d="m17.7 6.3 1.4-1.4" />
+      </>
+    ),
+    moon: (
+      <path d="M20.3 15.1A8 8 0 0 1 8.9 3.7 8.2 8.2 0 1 0 20.3 15.1Z" />
+    ),
+    monitor: (
+      <>
+        <rect x="3" y="4" width="18" height="12" rx="2" />
+        <path d="M8 20h8" />
+        <path d="M12 16v4" />
+      </>
+    ),
   }
 
   return (
@@ -194,6 +246,8 @@ function ResultRow({
 }
 
 function App() {
+  const [themeMode, setThemeMode] = useState<ThemeMode>(getStoredThemeMode)
+  const [systemTheme, setSystemTheme] = useState<ResolvedTheme>(getSystemTheme)
   const [peptideMgInput, setPeptideMgInput] = useState('10')
   const [waterMlInput, setWaterMlInput] = useState('2')
   const [desiredDoseInput, setDesiredDoseInput] = useState('500')
@@ -206,6 +260,7 @@ function App() {
   const waterMl = parsePositiveNumber(waterMlInput)
   const desiredDose = parsePositiveNumber(desiredDoseInput)
   const selectedSyringe = getSyringeById(syringeId)
+  const resolvedTheme = themeMode === 'system' ? systemTheme : themeMode
 
   const calculation = useMemo(() => {
     if (peptideMg === null || waterMl === null || desiredDose === null) {
@@ -241,6 +296,23 @@ function App() {
   useEffect(() => {
     window.localStorage.setItem(presetStorageKey, JSON.stringify(savedPresets))
   }, [savedPresets])
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: light)')
+    const syncSystemTheme = () => setSystemTheme(mediaQuery.matches ? 'light' : 'dark')
+
+    syncSystemTheme()
+    mediaQuery.addEventListener('change', syncSystemTheme)
+
+    return () => mediaQuery.removeEventListener('change', syncSystemTheme)
+  }, [])
+
+  useEffect(() => {
+    window.localStorage.setItem(themeModeStorageKey, themeMode)
+    document.documentElement.dataset.theme = resolvedTheme
+    document.documentElement.dataset.themeMode = themeMode
+    document.documentElement.style.colorScheme = resolvedTheme
+  }, [resolvedTheme, themeMode])
 
   function applySavedPreset(preset: SavedPreset) {
     setPeptideMgInput(String(preset.peptideMg))
@@ -307,17 +379,34 @@ function App() {
         : '--'
 
   return (
-    <div className="app-shell">
+    <div className="app-shell" data-theme={resolvedTheme}>
       <header className="site-header">
         <a className="brand-lockup" href="https://8westbio.com" aria-label="8 West Bio home">
           <img src="/8westbio-logo.png" alt="8 West Bio" />
         </a>
-        <nav aria-label="Primary navigation">
-          <a href="#calculator" aria-current="page">Calculator</a>
-          <a href="#formula">Formula</a>
-          <a href="#faq">FAQ</a>
-          <a href="https://8westbio.com">8westbio.com</a>
-        </nav>
+        <div className="header-actions">
+          <nav aria-label="Primary navigation">
+            <a href="#calculator" aria-current="page">Calculator</a>
+            <a href="#formula">Formula</a>
+            <a href="#faq">FAQ</a>
+            <a href="https://8westbio.com">8westbio.com</a>
+          </nav>
+          <div className="theme-toggle" role="group" aria-label="Color theme">
+            {themeModes.map((mode) => (
+              <button
+                type="button"
+                key={mode.id}
+                className={themeMode === mode.id ? 'active' : ''}
+                aria-pressed={themeMode === mode.id}
+                title={`${mode.label} theme`}
+                onClick={() => setThemeMode(mode.id)}
+              >
+                <Icon name={mode.icon} />
+                <span>{mode.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       </header>
 
       <main>

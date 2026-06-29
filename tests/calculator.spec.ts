@@ -20,3 +20,18 @@ test('calculates defaults and handles syringe capacity warnings', async ({ page 
   await expect(page.getByText('Draw volume exceeds selected syringe capacity.')).toHaveCount(0)
   await expect(resultsPanel.locator('output').filter({ hasText: '1.60 mL' }).first()).toBeVisible()
 })
+
+test('switches between light, dark, and system theme modes', async ({ page }) => {
+  await page.goto('/')
+
+  await page.getByRole('button', { name: 'Light' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'light')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'light')
+
+  await page.getByRole('button', { name: 'Dark' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'dark')
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark')
+
+  await page.getByRole('button', { name: 'System' }).click()
+  await expect(page.locator('html')).toHaveAttribute('data-theme-mode', 'system')
+})
