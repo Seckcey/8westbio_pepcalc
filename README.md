@@ -1,32 +1,80 @@
-# React + TypeScript + Vite
+# 8 West Bio Peptide Dosing Calculator
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+Static React/Vite web app for `https://calc.8westbio.com`.
 
-Currently, two official plugins are available:
+The calculator converts vial size, reconstitution volume, desired research amount, and syringe type into concentration, draw volume, syringe markings, approximate full draws per vial, and remainder. It is designed as a branded 8 West Bio research-use planning tool.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Research-Use Scope
 
-## React Compiler
+This tool is provided for laboratory research planning only.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- Not for human or veterinary use.
+- Not for diagnostic or therapeutic procedures.
+- Outputs are estimates and should be independently verified before any laboratory workflow.
 
-## Expanding the Oxlint configuration
+## Features
 
-If you are developing a production application, we recommend enabling type-aware lint rules by installing `oxlint-tsgolint` and editing `.oxlintrc.json`:
+- Vial amount and reconstitution volume inputs.
+- Desired amount input with `mcg` and `mg` unit modes.
+- U-100 insulin syringe unit conversion.
+- 1 mL, 0.5 mL, 0.3 mL, and 3 mL syringe capacity support.
+- Warnings when draw volume exceeds selected syringe capacity.
+- Warnings for volumes below readable syringe increments.
+- Formula and audit trail shown on the page.
+- Copyable result summary for research notes.
+- Local saved setup presets stored in the browser.
+- Mobile-friendly responsive layout.
 
-```json
-{
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "plugins": ["react", "typescript", "oxc"],
-  "options": {
-    "typeAware": true
-  },
-  "rules": {
-    "react/rules-of-hooks": "error",
-    "react/only-export-components": ["warn", { "allowConstantExport": true }]
-  }
-}
+## Requirements
+
+- Node.js 24 or newer
+- npm 11 or newer
+
+## Local Setup
+
+```powershell
+npm install
+npm run dev
 ```
 
-See the [Oxlint rules documentation](https://oxc.rs/docs/guide/usage/linter/rules) for the full list of rules and categories.
+Vite will print a local URL, usually `http://localhost:5173/`.
+
+## Production Build
+
+```powershell
+npm run build
+npm run preview
+```
+
+The deployable static files are generated in `dist/`.
+
+## Deployment Notes
+
+This app does not require a VPS for the first release. It can be hosted as static files through Cloudflare Pages, Netlify, Vercel, GitHub Pages, or an Nginx static site.
+
+Recommended production settings:
+
+- Build command: `npm run build`
+- Output directory: `dist`
+- Domain: `calc.8westbio.com`
+- Enforce HTTPS
+- Add a redirect from `http://calc.8westbio.com` to HTTPS
+
+## Formula
+
+```text
+Concentration (mg/mL) = peptide amount (mg) / water added (mL)
+Desired amount (mg) = desired amount (mcg) / 1000
+Draw volume (mL) = desired amount (mg) / concentration (mg/mL)
+U-100 syringe units = draw volume (mL) x 100
+Approx. full draws per vial = floor(peptide amount (mg) / desired amount (mg))
+```
+
+## Available Scripts
+
+```powershell
+npm run dev
+npm run build
+npm run lint
+npm run preview
+```
