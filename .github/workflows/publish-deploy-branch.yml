@@ -1,0 +1,62 @@
+name: Build Static Deployment Artifact
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: calculator-static-artifact-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-package:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production site
+        run: npm run build
+
+      - name: Run analytics contract
+        run: npm run test:e2e -- tests/analytics.spec.ts
+
+      - name: Write deployment manifest
+        run: |
+          set -Eeuo pipefail
+          printf '%s\n' "${GITHUB_SHA}" > dist/SOURCE_COMMIT
+          printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist/BUILD_TIME_UTC
+          (
+            cd dist
+            find . -type f \
+              ! -name SHA256SUMS \
+              -print0 \
+              | sort -z \
+              | xargs -0 sha256sum \
+              > SHA256SUMS
+          )
+
+      - name: Upload deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: calc-8westbio-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 9
