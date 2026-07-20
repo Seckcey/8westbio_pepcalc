@@ -58,5 +58,6 @@ jobs:
           name: calc-8westbio-${{ github.sha }}
           path: dist/
           if-no-files-found: error
+          include-hidden-files: true
           retention-days: 7
           compression-level: 9
