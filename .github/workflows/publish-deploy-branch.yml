@@ -1,20 +1,21 @@
-name: Publish Static Deploy Branch
+name: Build Static Deployment Artifact
 
 on:
+  pull_request:
   push:
     branches:
       - main
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
-  group: calculator-static-deploy
-  cancel-in-progress: false
+  group: calculator-static-artifact-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-publish:
+  build-and-package:
     runs-on: ubuntu-latest
 
     steps:
@@ -41,7 +42,6 @@ jobs:
           set -Eeuo pipefail
           printf '%s\n' "${GITHUB_SHA}" > dist/SOURCE_COMMIT
           printf '%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist/BUILD_TIME_UTC
-          touch dist/.nojekyll
           (
             cd dist
             find . -type f \
@@ -52,18 +52,11 @@ jobs:
               > SHA256SUMS
           )
 
-      - name: Publish deploy branch
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -Eeuo pipefail
-          cd dist
-          git init
-          git checkout -b deploy
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add --all
-          git commit -m "Publish calculator ${GITHUB_SHA}"
-          git push --force \
-            "https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
-            HEAD:deploy
+      - name: Upload deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: calc-8westbio-${{ github.sha }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 9
