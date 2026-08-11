@@ -60,6 +60,22 @@ Recommended production settings:
 - Enforce HTTPS
 - Add a redirect from `http://calc.8westbio.com` to HTTPS
 
+HTML is served with `no-store` during the analytics migration so a new content-hashed bundle can
+replace the previous bundle safely. Missing `/assets/*` requests return 404 instead of the SPA shell.
+
+## Analytics and Privacy
+
+The calculator uses the existing 8 West Bio GA4 web stream (`G-2L4W1CJC8D`) so storefront and
+calculator activity remain in one property. Google Analytics is optional and does not load until a
+visitor explicitly allows it. Advertising storage, Google Signals, and ad personalization stay off.
+
+The custom calculator layer records only five coarse interactions: first calculator use, applying a
+preset, saving a preset, copying results, and changing the color theme. GA4 can also emit its standard
+session and device events. Dosage inputs, syringe selections, calculated results, copied text,
+saved-preset contents, query strings, and URL hashes are not sent.
+
+Real `robots.txt` and `sitemap.xml` files are included for the calculator host.
+
 ## Formula
 
 ```text
