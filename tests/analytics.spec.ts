@@ -152,14 +152,20 @@ test('sanitizes production GA4 configuration and custom events at runtime', asyn
   await page.getByLabel('Desired amount per draw').fill('8000')
   await expect.poll(async () => {
     return page.evaluate(() => {
-      const commands = (window as typeof window & { dataLayer?: unknown[][] }).dataLayer ?? []
+      const commands = (window as typeof window & { dataLayer?: ArrayLike<unknown>[] }).dataLayer ?? []
       return commands.some((command) => command[0] === 'event' && command[1] === 'calculator_used')
     })
   }).toBe(true)
 
   const queuedCommands = await page.evaluate(
-    () => (window as typeof window & { dataLayer?: unknown[][] }).dataLayer ?? [],
+    () => (window as typeof window & { dataLayer?: ArrayLike<unknown>[] }).dataLayer ?? [],
   )
+  const queuedCommandShapes = await page.evaluate(() => {
+    const commands = (window as typeof window & { dataLayer?: unknown[] }).dataLayer ?? []
+    return commands
+      .filter((command) => typeof (command as { 0?: unknown })[0] === 'string')
+      .map((command) => Object.prototype.toString.call(command))
+  })
   const config = queuedCommands.find(
     (command) => command[0] === 'config' && command[1] === 'G-2L4W1CJC8D',
   )
@@ -175,6 +181,7 @@ test('sanitizes production GA4 configuration and custom events at runtime', asyn
   expect(calculatorEvent?.[2]).toMatchObject({
     calculator_type: 'peptide_reconstitution',
   })
+  expect(queuedCommandShapes).toEqual(Array(7).fill('[object Arguments]'))
   expect(JSON.stringify(queuedCommands)).not.toContain('private')
   expect(JSON.stringify(queuedCommands)).not.toContain('#result')
   expect(JSON.stringify(queuedCommands)).not.toContain('8000')

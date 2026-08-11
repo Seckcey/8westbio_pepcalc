@@ -2,7 +2,7 @@ type GtagCommand = [command: string, ...args: unknown[]]
 
 declare global {
   interface Window {
-    dataLayer?: GtagCommand[]
+    dataLayer?: IArguments[]
     gtag?: (...args: GtagCommand) => void
   }
 }
@@ -46,8 +46,8 @@ function writeStoredConsent(choice: Exclude<AnalyticsConsentChoice, 'unknown'>) 
 
 function ensureGtag() {
   window.dataLayer ??= []
-  window.gtag ??= (...args: GtagCommand) => {
-    window.dataLayer?.push(args)
+  window.gtag ??= function gtag() {
+    window.dataLayer?.push(arguments)
   }
   return window.gtag
 }
