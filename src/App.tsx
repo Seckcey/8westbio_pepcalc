@@ -8,6 +8,7 @@ import {
   vialPresetMg,
   type DoseUnit,
 } from './calculator'
+import { AnalyticsPreferences } from './AnalyticsPreferences'
 import './App.css'
 
 type SavedPreset = {
@@ -796,6 +797,7 @@ function App() {
           Calculations are estimates and should be independently verified before any laboratory
           workflow. 8 West Bio is not responsible for use of this tool.
         </p>
+        <AnalyticsPreferences />
       </footer>
     </div>
   )

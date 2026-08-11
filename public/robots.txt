@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://calc.8westbio.com/sitemap.xml

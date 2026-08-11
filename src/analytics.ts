@@ -1,63 +1,169 @@
-type UmamiClient = {
-  track: (name: string, data?: Record<string, string>) => void
-}
+type GtagCommand = [command: string, ...args: unknown[]]
 
 declare global {
   interface Window {
-    umami?: UmamiClient
+    dataLayer?: GtagCommand[]
+    gtag?: (...args: GtagCommand) => void
   }
 }
 
-const analyticsScript = 'https://analytics.8westventures.com/script.js'
-const websiteId = 'f67652d6-9b7b-46c5-a807-dd971150369e'
+export type AnalyticsConsentChoice = 'unknown' | 'granted' | 'denied'
+
+const measurementId = 'G-2L4W1CJC8D'
 const productionHost = 'calc.8westbio.com'
-const pendingEvents: Array<{ name: string; data: Record<string, string> }> = []
+const consentStorageKey = '8westbio-calculator-analytics-consent-v1'
+const trackerSelector = 'script[data-analytics-provider="ga4"]'
+let analyticsConsent: AnalyticsConsentChoice | null = null
+let analyticsActivated = false
+let pageViewSent = false
+let uiTrackingAttached = false
 
-function flushEvents() {
-  if (!window.umami || typeof window.umami.track !== 'function') return
+function readStoredConsent(): AnalyticsConsentChoice {
+  try {
+    const storedConsent = window.localStorage.getItem(consentStorageKey)
+    return storedConsent === 'granted' || storedConsent === 'denied'
+      ? storedConsent
+      : 'unknown'
+  } catch {
+    return 'unknown'
+  }
+}
 
-  while (pendingEvents.length > 0) {
-    const event = pendingEvents.shift()
-    if (!event) continue
+export function getAnalyticsConsent(): AnalyticsConsentChoice {
+  if (typeof window === 'undefined') return 'unknown'
+  analyticsConsent ??= readStoredConsent()
+  return analyticsConsent
+}
 
-    try {
-      window.umami.track(event.name, event.data)
-    } catch {
-      pendingEvents.length = 0
-    }
+function writeStoredConsent(choice: Exclude<AnalyticsConsentChoice, 'unknown'>) {
+  try {
+    window.localStorage.setItem(consentStorageKey, choice)
+  } catch {
+    // A blocked storage API must not affect calculator behavior.
+  }
+  analyticsConsent = choice
+}
+
+function ensureGtag() {
+  window.dataLayer ??= []
+  window.gtag ??= (...args: GtagCommand) => {
+    window.dataLayer?.push(args)
+  }
+  return window.gtag
+}
+
+function deniedConsentState() {
+  return {
+    analytics_storage: 'denied',
+    ad_storage: 'denied',
+    ad_user_data: 'denied',
+    ad_personalization: 'denied',
+  }
+}
+
+function sanitizedPageLocation() {
+  if (window.location.protocol !== 'https:' || window.location.hostname !== productionHost) {
+    return `https://${productionHost}/`
+  }
+
+  return `${window.location.origin}${window.location.pathname || '/'}`
+}
+
+function sanitizedPageReferrer() {
+  if (!document.referrer) return ''
+
+  try {
+    const referrer = new URL(document.referrer)
+    if (referrer.protocol !== 'https:' && referrer.protocol !== 'http:') return ''
+
+    const isBioHost =
+      referrer.hostname === '8westbio.com' || referrer.hostname.endsWith('.8westbio.com')
+    return `${referrer.origin}${isBioHost ? referrer.pathname || '/' : '/'}`
+  } catch {
+    return ''
+  }
+}
+
+function sendPageView() {
+  if (pageViewSent || getAnalyticsConsent() !== 'granted' || !window.gtag) return
+  pageViewSent = true
+
+  window.gtag('event', 'page_view', {
+    send_to: measurementId,
+    page_location: sanitizedPageLocation(),
+    page_path: window.location.pathname || '/',
+    page_title: '8 West Bio Peptide Dosing Calculator',
+  })
+}
+
+function loadTracker() {
+  if (window.location.hostname !== productionHost || getAnalyticsConsent() !== 'granted') return
+  if (analyticsActivated || document.querySelector(trackerSelector)) return
+
+  analyticsActivated = true
+  const gtag = ensureGtag()
+
+  gtag('consent', 'default', deniedConsentState())
+  gtag('set', 'ads_data_redaction', true)
+  gtag('consent', 'update', {
+    ...deniedConsentState(),
+    analytics_storage: 'granted',
+  })
+  gtag('js', new Date())
+  gtag('config', measurementId, {
+    send_page_view: false,
+    cookie_domain: '8westbio.com',
+    allow_google_signals: false,
+    allow_ad_personalization_signals: false,
+    page_location: sanitizedPageLocation(),
+    page_referrer: sanitizedPageReferrer(),
+  })
+
+  const script = document.createElement('script')
+  script.async = true
+  script.src = `https://www.googletagmanager.com/gtag/js?id=${measurementId}`
+  script.dataset.analyticsProvider = 'ga4'
+  document.head.appendChild(script)
+
+  sendPageView()
+}
+
+export function setAnalyticsConsent(choice: Exclude<AnalyticsConsentChoice, 'unknown'>) {
+  const previousChoice = getAnalyticsConsent()
+  writeStoredConsent(choice)
+
+  if (choice === 'granted') {
+    loadTracker()
+    return
+  }
+
+  if (window.gtag) {
+    window.gtag('consent', 'update', deniedConsentState())
+  }
+
+  if (previousChoice === 'granted' || analyticsActivated || document.querySelector(trackerSelector)) {
+    window.setTimeout(() => window.location.reload(), 0)
   }
 }
 
 function trackEvent(name: string, data: Record<string, string> = {}) {
-  const eventData = { environment: 'production', ...data }
-
-  if (window.umami && typeof window.umami.track === 'function') {
-    try {
-      window.umami.track(name, eventData)
-    } catch {
-      // Analytics must never affect calculator behavior.
-    }
+  if (
+    window.location.hostname !== productionHost ||
+    getAnalyticsConsent() !== 'granted' ||
+    !window.gtag
+  ) {
     return
   }
 
-  if (pendingEvents.length < 20) {
-    pendingEvents.push({ name, data: eventData })
+  try {
+    window.gtag('event', name, {
+      send_to: measurementId,
+      environment: 'production',
+      ...data,
+    })
+  } catch {
+    // Analytics must never affect calculator behavior.
   }
-}
-
-function loadTracker() {
-  if (window.location.hostname !== productionHost) return
-  if (document.querySelector(`script[data-website-id="${websiteId}"]`)) return
-
-  const script = document.createElement('script')
-  script.async = true
-  script.src = analyticsScript
-  script.dataset.websiteId = websiteId
-  script.dataset.domains = productionHost
-  script.dataset.excludeSearch = 'true'
-  script.dataset.excludeHash = 'true'
-  script.addEventListener('load', flushEvents, { once: true })
-  document.head.appendChild(script)
 }
 
 function themeModeFromButton(button: HTMLButtonElement) {
@@ -69,11 +175,14 @@ function themeModeFromButton(button: HTMLButtonElement) {
 }
 
 function attachUiTracking() {
+  if (uiTrackingAttached) return true
+
   const calculatorForm = document.querySelector<HTMLFormElement>('.calculator-panel')
   const presetList = document.querySelector<HTMLElement>('.preset-list')
   const copyButton = document.querySelector<HTMLButtonElement>('.copy-button')
 
   if (!calculatorForm || !presetList) return false
+  uiTrackingAttached = true
 
   let calculatorUsed = false
   let savePending = false
@@ -153,6 +262,6 @@ function waitForUi() {
 
 export function initializeAnalytics() {
   if (window.location.hostname !== productionHost) return
-  loadTracker()
+  if (getAnalyticsConsent() === 'granted') loadTracker()
   waitForUi()
 }
